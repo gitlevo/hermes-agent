@@ -14,6 +14,7 @@ import re
 import time
 from contextvars import ContextVar
 from datetime import datetime, timezone, UTC
+from collections.abc import Mapping
 from typing import Any, Awaitable, Callable, Dict, Iterator, List, Optional, Set
 from hermes_cli import setup_platforms
 
@@ -6473,6 +6474,48 @@ class TelegramAdapter(TelegramHeldInboundMixin, TelegramTopicRoutingMixin, BaseP
         """Message-like payload for normal messages and channel posts (``update.channel_post``)."""
         return getattr(update, "effective_message", None) or getattr(update, "message", None)
 
+    # mooxi patch (MOOXI-PATCHES.md, "forwarded"): a forwarded message carries someone else's words. The
+    # allowed user only pressed "forward", so treating its text as an instruction from them is a prompt-
+    # injection path (a stranger's message, forwarded once, becomes a command). Forwarded messages are never
+    # turned into agent turns, nor observed into a group transcript; in a private chat the sender is told why.
+    FORWARDED_REFUSAL = ("I don't act on forwarded messages: they are someone else's words. "
+                         "If you want me to do something with it, tell me in your own words.")
+
+    _LEGACY_FORWARD_FIELDS = ("forward_from", "forward_from_chat", "forward_from_message_id",
+                              "forward_sender_name", "forward_signature", "forward_date")
+
+    @staticmethod
+    def _is_forwarded_message(msg) -> bool:
+        """True for any forward: Bot API 7.0+ ``forward_origin``, the pre-7.0 ``forward_*`` fields (PTB 21+
+        keeps unknown fields in ``api_kwargs``), and a channel post auto-forwarded into its discussion group.
+        The origin is matched by its Bot API type name (MessageOriginUser/HiddenUser/Chat/Channel), not by
+        truthiness or an import, so a mock message's auto-attributes or a mocked ``telegram`` module never
+        read as a forward and never crash the handler."""
+        origin = getattr(msg, "forward_origin", None)
+        if origin is not None and type(origin).__name__.startswith("MessageOrigin"):
+            return True
+        if getattr(msg, "is_automatic_forward", None) is True:
+            return True
+        api_kwargs = getattr(msg, "api_kwargs", None)
+        # PTB hands api_kwargs out as a read-only mappingproxy, so test for a Mapping, not a dict
+        legacy = [api_kwargs.get(f) if isinstance(api_kwargs, Mapping) else None
+                  for f in TelegramAdapter._LEGACY_FORWARD_FIELDS]
+        return any(v is not None for v in legacy)
+
+    async def _refuse_forwarded(self, msg) -> bool:
+        """Drop a forwarded message before any event is built; True when it was dropped. Call after the
+        authorization check, so only the allowed user ever gets the explanation."""
+        if not self._is_forwarded_message(msg):
+            return False
+        chat = getattr(msg, "chat", None)
+        logger.info("[Telegram] Refused a forwarded message in chat %s", getattr(chat, "id", None))
+        if getattr(chat, "type", None) == "private":
+            try:
+                await msg.reply_text(self.FORWARDED_REFUSAL)
+            except Exception:
+                logger.warning("[Telegram] Could not send the forwarded-message notice", exc_info=True)
+        return True
+
     def _log_blocked_user(self, msg, *, level=logging.WARNING, what: str = "unauthorized user") -> None:
         logger.log(
             level, "[Telegram] Blocked %s %s in chat %s", what, getattr(getattr(msg, "from_user", None), "id", None),
@@ -6504,6 +6547,8 @@ class TelegramAdapter(TelegramHeldInboundMixin, TelegramTopicRoutingMixin, BaseP
         if not self._is_user_authorized_from_message(msg):
             self._log_blocked_user(msg)
             return
+        if await self._refuse_forwarded(msg):
+            return
         if not self._gate_or_observe(msg, update, MessageType.TEXT):
             return
         await self._ensure_forum_commands(update.message)
@@ -6518,6 +6563,8 @@ class TelegramAdapter(TelegramHeldInboundMixin, TelegramTopicRoutingMixin, BaseP
             return
         if not self._is_user_authorized_from_message(msg):
             self._log_blocked_user(msg)
+            return
+        if await self._refuse_forwarded(msg):
             return
         await self._ensure_forum_commands(msg)
         event = await self._build_triggered_event(msg, update, MessageType.COMMAND)
@@ -6535,6 +6582,8 @@ class TelegramAdapter(TelegramHeldInboundMixin, TelegramTopicRoutingMixin, BaseP
             return
         if not self._is_user_authorized_from_message(msg):
             self._log_blocked_user(msg)
+            return
+        if await self._refuse_forwarded(msg):
             return
         if not self._gate_or_observe(msg, update, MessageType.LOCATION):
             return
@@ -6825,6 +6874,8 @@ class TelegramAdapter(TelegramHeldInboundMixin, TelegramTopicRoutingMixin, BaseP
             return
         if not self._is_user_authorized_from_message(msg):
             self._log_blocked_user(msg, level=logging.INFO, what="media from unauthorized user")
+            return
+        if await self._refuse_forwarded(msg):
             return
         if not self._should_process_message(msg):
             if self._should_observe_unmentioned_group_message(msg):
