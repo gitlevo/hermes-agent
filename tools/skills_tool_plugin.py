@@ -4,6 +4,7 @@ file-serving helpers shared with the local-skill path. Helpers tests patch on th
 
 import json
 import logging
+import re
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List
@@ -18,6 +19,31 @@ _INJECTION_PATTERNS: list = [  # shared by local-skill and plugin-skill paths
     "ignore previous instructions", "ignore all previous", "you are now",
     "disregard your", "forget your instructions", "new instructions:",
     "system prompt:", "<system>", "]]>"]
+# mooxi patch, CVE-2026-10220: the literals above are matched as plain substrings, so one extra word or
+# space ("ignore ALL prior instructions", "forget your  original  instructions") slipped past. The same
+# phrases as word-tolerant regexes, plus every "injection" pattern of the install-time guard
+# (tools.skills_guard), are what _has_injection_pattern checks now. The literal list stays exported.
+_INJECTION_REGEXES = [re.compile(p, re.IGNORECASE) for p in (
+    r"\bignore\s+(?:\w+\s+)*?(?:previous|prior|above|earlier|all)\b",
+    r"\byou\s+are\s+(?:\w+\s+)*?now\b",
+    r"\bdisregard\s+(?:\w+\s+)*?(?:your|all|any|previous|prior|the)\b",
+    r"\bforget\s+(?:\w+\s+)*?(?:instructions|rules|guidelines|prompt)\b",
+    r"\bnew\s+(?:\w+\s+)*?instructions\s*:",
+    r"\bsystem\s+prompt\s*:",
+    r"<\s*/?\s*system\s*>",
+    r"\]\]>")]
+
+
+def _has_injection_pattern(content: str) -> bool:
+    """Word- and whitespace-tolerant prompt-injection check for skill_view (local and plugin skills)."""
+    if any(rx.search(content) for rx in _INJECTION_REGEXES):
+        return True
+    try:  # lazy: skills_guard is large and this module is on the skill_view hot path
+        from tools.skills_guard import _COMPILED_THREAT_PATTERNS
+    except Exception:
+        return False
+    return any(category == "injection" and rx.search(content)
+               for rx, _pid, _severity, category, *_ in _COMPILED_THREAT_PATTERNS)
 _SUPPORT_DIRS = ("references", "templates", "assets", "scripts")
 _SKILL_FILE_EXTS = {".md", ".py", ".yaml", ".yml", ".json", ".tex", ".sh"}
 
@@ -142,7 +168,7 @@ def _serve_plugin_skill(
                      readiness_status=SkillReadinessStatus.UNSUPPORTED.value)
     if file_path:
         return _serve_skill_file(skill_md.parent, file_path, qualified_name, read_error_prefix=True)
-    if any(p in content.lower() for p in _INJECTION_PATTERNS):
+    if _has_injection_pattern(content):  # mooxi patch, CVE-2026-10220
         logger.warning(
             "Plugin skill '%s:%s' contains patterns that may indicate prompt injection", namespace, bare)
     banner = ""
