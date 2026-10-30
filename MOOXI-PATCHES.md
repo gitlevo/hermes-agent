@@ -60,3 +60,14 @@ In a scratch venv (`uv sync --frozen --extra telegram --group dev --group test`,
 the new test files pass, and the existing suites for the touched code (`tests/gateway/test_telegram_*.py`,
 the approval/yolo/skills suites) show the same failures with and without these patches (failures that
 already happen on the bare tag in that environment).
+
+## Upstream status (2026-10-30)
+
+Each patch is meant to go away once upstream covers it (see gitlevo/mooxi `infra/mind/brain/README.md`).
+
+| Patch | Upstream | Drop when |
+|---|---|---|
+| 1. Forwarded Telegram messages | PR NousResearch/hermes-agent#146953: opt-in `platforms.telegram.extra.ignore_forwarded_messages` | it merges; mooxi then sets the switch |
+| 2. `approvals.allow_yolo` | issue #131038 (tied to the settings-lock PR #106869) asks for the same | that lands |
+| 3. `skills.hub_enabled` | PR #81273: `skills.hub.source_policy` (an allowlist; empty = every source off) | it merges; mooxi then sets an empty allowlist |
+| CVE-2026-10220 | PR NousResearch/hermes-agent#146952 (public under SECURITY.md §3.2; the CVE is on NVD) | it merges |
