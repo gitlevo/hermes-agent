@@ -36,6 +36,12 @@ def toggle_session_yolo(session_key: str, enabled: Optional[bool] = None, *, per
     turns it OFF. The write runs BEFORE the live flip, so a turn restoring in between never revives a
     bypass that is being switched off.
     """
+    if not approval.approval_context.yolo_allowed():
+        # mooxi patch: approvals.allow_yolo: false. Clear any stored ON so a later allow_yolo: true does not
+        # silently revive it, and report OFF whatever was asked.
+        _persist(persist, False, session_key)
+        approval.disable_session_yolo(session_key)
+        return False
     if enabled is None:
         enabled = not (persisted or approval.is_session_yolo_enabled(session_key))
     _persist(persist, enabled, session_key)
@@ -50,6 +56,7 @@ def restore_session_yolo(session_key: str, persisted: bool) -> bool:
     transport-local id. Skipped under the frozen process ``--yolo``, which already bypasses everything.
     """
     if (not session_key or not persisted or approval._YOLO_MODE_FROZEN
+            or not approval.approval_context.yolo_allowed()  # mooxi patch: approvals.allow_yolo: false
             or approval.is_session_yolo_enabled(session_key)):
         return False
     approval.enable_session_yolo(session_key)
