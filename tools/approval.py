@@ -44,7 +44,9 @@ logger = logging.getLogger(__name__)
 
 # Frozen at import: reading os.environ per call would let any skill running in the process set
 # this and bypass every approval check (prompt-injection escalation path).
-_YOLO_MODE_FROZEN: bool = is_truthy_value(os.getenv("HERMES_YOLO_MODE", ""))
+# mooxi patch: ``approvals.allow_yolo: false`` voids the flag here, so every reader of _YOLO_MODE_FROZEN
+# (hosted-room policy, session rows, banners) sees it off; the bypass checks below re-read the switch live.
+_YOLO_MODE_FROZEN: bool = is_truthy_value(os.getenv("HERMES_YOLO_MODE", "")) and approval_context.yolo_allowed()
 
 
 # --- Per-session approval state (thread-safe) -----------------------------------------------------------------------
@@ -282,6 +284,9 @@ def _release_permission_mode_dependents(session_key: str) -> None:
 def _set_session_yolo(session_key: str, enabled: bool) -> None:
     if not session_key:
         return
+    if enabled and not approval_context.yolo_allowed():  # mooxi patch: approvals.allow_yolo: false
+        logger.warning("YOLO is disabled by approvals.allow_yolo: false; not enabling it for %s", session_key)
+        return
     with _lock:
         (_session_yolo.add if enabled else _session_yolo.discard)(session_key)
     _release_permission_mode_dependents(session_key)
@@ -324,7 +329,7 @@ def clear_session(session_key: str) -> None:
 
 def is_session_yolo_enabled(session_key: str) -> bool:
     """Return True when YOLO bypass is enabled for a specific session."""
-    if not session_key:
+    if not session_key or not approval_context.yolo_allowed():  # mooxi patch: allow_yolo false wins over any set
         return False
     with _lock:
         return session_key in _session_yolo
@@ -335,10 +340,16 @@ def is_current_session_yolo_enabled() -> bool:
     return is_session_yolo_enabled(get_current_session_key(default=""))
 
 
+def _process_yolo() -> bool:
+    """The process ``--yolo``, unless ``approvals.allow_yolo`` is false now (mooxi patch: the frozen flag is
+    read once at import; the switch is re-read so a config change also revokes it)."""
+    return _YOLO_MODE_FROZEN and approval_context.yolo_allowed()
+
+
 def _yolo_active() -> bool:
     """CLI ``--yolo`` (process-scoped, frozen at import) or gateway ``/yolo``
     (session-scoped). Hardline / deny-rule floors run BEFORE this everywhere."""
-    if _YOLO_MODE_FROZEN or is_current_session_yolo_enabled():
+    if _process_yolo() or is_current_session_yolo_enabled():
         return True
     from gateway.session_finite import unattended_turn
     return unattended_turn()
@@ -518,7 +529,7 @@ def is_approval_bypass_active_for_session(session_key: str) -> bool:
     """Canonical three-source bypass check: process ``--yolo`` (frozen at import), the
     session-scoped gateway ``/yolo`` toggle, ``approvals.mode: off``. Pure bypass
     sub-expression only — hardline blocklist / permanent allowlist are the caller's job."""
-    return (_YOLO_MODE_FROZEN or is_session_yolo_enabled(session_key) or approval_context._get_approval_mode() == "off")
+    return (_process_yolo() or is_session_yolo_enabled(session_key) or approval_context._get_approval_mode() == "off")
 
 
 def is_approval_bypass_active() -> bool:

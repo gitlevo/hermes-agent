@@ -962,8 +962,16 @@ class GatewaySlashCommandsMixin(
     async def _handle_yolo_command(self, event: MessageEvent) -> str | EphemeralReply:
         """Handle /yolo — toggle dangerous command approval bypass for this session only. The flag is
         persisted on the routing entry so it survives a gateway restart."""
+        from tools.approval_context import yolo_allowed
         from tools.approval_yolo import toggle_session_yolo
         session_key = self._session_key_for_source(event.source)
+        if not yolo_allowed():
+            # mooxi patch: approvals.allow_yolo: false. Toggle anyway (it clears a stored ON), then say why.
+            store = self.session_store
+            persist = (lambda on: store.set_session_yolo(session_key, on)) if store is not None else None
+            await asyncio.to_thread(toggle_session_yolo, session_key, False, persist=persist)
+            return EphemeralReply("YOLO is turned off on this machine (approvals.allow_yolo: false). "
+                                  "Dangerous commands still need your approval.")
         persisted, persist = False, None
         if (store := self.session_store) is not None:
             # A first-message /yolo has no routing entry yet; materialize it so the flag has a home.
