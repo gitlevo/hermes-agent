@@ -1712,6 +1712,9 @@ DEFAULT_CONFIG = {
         # / Cancel via tools.slash_confirm; native buttons on Telegram/ Discord/Slack). "Always
         # Approve" → false. HERMES_TUI_NO_CONFIRM=1 skips the TUI modal.
         "destructive_slash_confirm": True,
+        # mooxi patch: false makes --yolo / HERMES_YOLO_MODE and /yolo do nothing (see
+        # tools.approval_context.yolo_allowed). True is upstream behaviour.
+        "allow_yolo": True,
     },
     # Permanently allowed dangerous command patterns (added via "always" approval).
     "command_allowlist": [],

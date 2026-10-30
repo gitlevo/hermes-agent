@@ -291,6 +291,15 @@ def _get_approval_config() -> dict:
         return {}
 
 
+def yolo_allowed() -> bool:
+    """``approvals.allow_yolo`` (mooxi patch, MOOXI-PATCHES.md; default true = upstream behaviour). False makes
+    every YOLO surface inert: the process ``--yolo`` / ``HERMES_YOLO_MODE``, the ``/yolo`` toggle, and a
+    persisted, restored or launch-seeded session bypass. An operator who must always see dangerous commands
+    sets it false; nothing the agent or a chat user does at runtime can then switch approvals off this way.
+    (``approvals.mode: off`` is a separate, explicit config choice and is not affected.)"""
+    return is_truthy_value(_get_approval_config().get("allow_yolo", True), default=True)
+
+
 def _get_approval_mode() -> str:
     """Return 'manual', 'smart', or 'off' (a hosted-room policy overrides config)."""
     try:
