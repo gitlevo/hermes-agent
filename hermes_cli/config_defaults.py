@@ -1452,6 +1452,10 @@ DEFAULT_CONFIG = {
         # host-unapproved skill-author code; community hub installs never auto-execute (#63307).
         "inline_shell": False,
         "inline_shell_timeout": 10,  # seconds per !`cmd` snippet
+        # Skills hub (official, index, skills.sh, URL, GitHub taps, ClawHub, LobeHub, browse.sh). Off: every
+        # hub search, install, update and check finds no source, in the CLI, TUI, dashboard and chat tools.
+        # Skills already on disk and the agent's own skill_manage are unaffected.
+        "hub_enabled": True,
         # Security-scan skills the agent writes via skill_manage. Off: the agent can run the same
         # code via terminal() ungated, so it mostly blocks prose with risky keywords. On: a
         # dangerous verdict is a tool error the agent can retry. Hub installs are always scanned.
