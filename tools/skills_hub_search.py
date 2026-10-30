@@ -96,9 +96,20 @@ _INDEX_MISS_FALLBACK_IDS = _API_SOURCE_IDS - {"github"}
 _INDEX_MISS_FALLBACK_BUDGET = 8.0
 
 
+def hub_enabled() -> bool:
+    """``skills.hub_enabled`` (default true). Read live, so a config change needs no restart."""
+    try:
+        from hermes_cli.config import load_config
+        return load_config().get("skills", {}).get("hub_enabled", True) is not False
+    except Exception:
+        return True
+
+
 def create_source_router(auth: Optional[GitHubAuth] = None) -> list[SkillSource]:
-    """All configured source adapters, in priority order."""
+    """All configured source adapters, in priority order; none when ``skills.hub_enabled`` is false."""
     from tools.skills_hub import TapsManager
+    if not hub_enabled():
+        return []
     if auth is None:
         auth = GitHubAuth()
     return [

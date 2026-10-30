@@ -30,7 +30,15 @@ Test: `tests/gateway/test_telegram_forwarded_refusal.py`.
 `approvals.mode: off` is a separate, explicit config choice and is not affected; hardline blocks and deny
 rules are unchanged. Test: `tests/tools/test_approval_allow_yolo.py`.
 
-## 3. CVE status
+## 3. `skills.hub_enabled` (default `true`, upstream behaviour)
+
+`tools/skills_hub_search.py`, `hermes_cli/config_defaults.py`. Every hub search, install, update and check
+(CLI, TUI, dashboard, the `manage_catalog` chat tool) builds its sources with `create_source_router`. With
+`hub_enabled: false` it returns no source, so nothing can arrive from the official index, skills.sh, a URL,
+GitHub taps, ClawHub, LobeHub or browse.sh. The switch is read live. Skills already on disk and the agent's own
+`skill_manage` (behind `skills.write_approval`) are unaffected. Test: `tests/tools/test_skills_hub_enabled.py`.
+
+## 4. CVE status
 
 | CVE | Where | Status in v0.22.5 | What this branch does |
 |---|---|---|---|
@@ -42,7 +50,7 @@ Sources: NVD entries for both CVEs and the reporter's advisories linked from the
 
 As upstream, the `skill_view` check **warns** (a log line) and does not block: a regex list can never
 catch every phrasing. mooxi's real controls are elsewhere: skills need write approval
-(`skills.write_approval: true`), and no marketplace installs at runtime.
+(`skills.write_approval: true`), and no marketplace installs at runtime (`skills.hub_enabled: false`).
 Test: `tests/tools/test_skills_injection_cve_2026_10220.py` (the advisory's payloads, plus harmless text
 that must stay quiet).
 
