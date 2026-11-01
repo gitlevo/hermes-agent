@@ -38,7 +38,24 @@ rules are unchanged. Test: `tests/tools/test_approval_allow_yolo.py`.
 GitHub taps, ClawHub, LobeHub or browse.sh. The switch is read live. Skills already on disk and the agent's own
 `skill_manage` (behind `skills.write_approval`) are unaffected. Test: `tests/tools/test_skills_hub_enabled.py`.
 
-## 4. CVE status
+## 4. `agent.single_tool_call_models` (default `[]`, upstream behaviour)
+
+`agent/transports/chat_completions.py`, `hermes_cli/config_defaults.py`. gpt-oss's chat template (Harmony)
+renders at most one tool call per assistant turn and names each tool result after "the most recent assistant
+tool call"; Azure AI Foundry's gpt-oss deployments reject a history in which one assistant message carries
+several calls with HTTP 400 "Message has tool role, but there was no previous assistant message with a tool
+call!". A primary model that made parallel calls (DeepSeek) therefore made every fallback to gpt-oss fail on
+its first request, and the turn was lost (gitlevo/mooxi#70). The pre-call sanitizer does not help: the
+history is valid OpenAI Chat Completions, every call is answered.
+
+With model-name markers listed (e.g. `["gpt-oss"]`), `ChatCompletionsTransport.convert_messages` gives a
+matching model a wire copy in which each parallel batch becomes one assistant message per call, each followed
+by its own result (alias-aware matching; the first keeps the content and reasoning). It runs on every attempt,
+fallbacks included, since each attempt rebuilds its kwargs through the transport. Stored history is never
+rewritten. The switch is read live. Test: `tests/agent/transports/test_chat_completions_single_tool_call_models.py`
+(a replay of the failed request's shape).
+
+## 5. CVE status
 
 | CVE | Where | Status in v0.22.5 | What this branch does |
 |---|---|---|---|
@@ -70,4 +87,5 @@ Each patch is meant to go away once upstream covers it (see gitlevo/mooxi `infra
 | 1. Forwarded Telegram messages | PR NousResearch/hermes-agent#146953: opt-in `platforms.telegram.extra.ignore_forwarded_messages` | it merges; mooxi then sets the switch |
 | 2. `approvals.allow_yolo` | issue #131038 (tied to the settings-lock PR #106869) asks for the same | that lands |
 | 3. `skills.hub_enabled` | PR #81273: `skills.hub.source_policy` (an allowlist; empty = every source off) | it merges; mooxi then sets an empty allowlist |
+| 4. `agent.single_tool_call_models` | not covered upstream (no issue or PR for gpt-oss and parallel tool calls in history as of 2026-11-02); to be offered | upstream splits batches for one-call templates; mooxi then drops the switch |
 | CVE-2026-10220 | PR NousResearch/hermes-agent#146952 (public under SECURITY.md §3.2; the CVE is on NVD) | it merges |
