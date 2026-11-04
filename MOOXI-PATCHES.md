@@ -1,9 +1,12 @@
-# mooxi patches on Hermes Agent v0.22.5
+# mooxi patches on Hermes Agent v0.22.7
 
-Branch `mooxi/v0.22.5` = upstream tag `v0.22.5` (`bf0203a794a07aac3ff764972ab9087baa4e4f4e`) plus the
-commits below, one per patch. `mooxi/v0.22.5-base` is the bare tag, so a diff against it shows only these.
+Branch `mooxi/v0.22.7` = upstream tag `v0.22.7` (`b200f5bc60e31588ba2cb60e288029c4a54ba5fa`) plus the
+commits below, one per patch. `mooxi/v0.22.7-base` is the bare tag, so a diff against it shows only these.
 mooxi's brain image (`mooxi-brain`, built in gitlevo/mooxi `infra/mind/brain/`) overlays exactly the files
-listed here onto the official `nousresearch/hermes-agent:v0.22.5` image.
+listed here onto the official `nousresearch/hermes-agent:v0.22.7` image.
+
+Carried from `mooxi/v0.22.5` (gitlevo/mooxi#164): every patch applied to v0.22.7 without a conflict. None
+has landed upstream yet, so all of them stay.
 
 ## 1. Forwarded Telegram messages are never acted on
 
@@ -57,7 +60,7 @@ rewritten. The switch is read live. Test: `tests/agent/transports/test_chat_comp
 
 ## 5. CVE status
 
-| CVE | Where | Status in v0.22.5 | What this branch does |
+| CVE | Where | Status in v0.22.7 | What this branch does |
 |---|---|---|---|
 | CVE-2026-9353 | `THREAT_PATTERNS` in the skills guard (advisory names `agent/skills_guard.py`; in v0.22.5 it is `tools/skills_guard.py`) | **Fixed upstream.** `sys_prompt_override` is `system\s+(?:\w+\s+)*prompt\s+(?:\w+\s+)*override` and `fake_policy` is `new\s+(?:\w+\s+)*policy…`, so the advisory's extra-word bypass ("system prompt temporary override") matches. | A regression test pins it. |
 | CVE-2026-10220 | `skill_view` / `_serve_plugin_skill` (`tools/skills_tool.py`; in v0.22.5 the shared code is in `tools/skills_tool_plugin.py`) | **Not fixed.** Both paths still test `any(p in content.lower() for p in _INJECTION_PATTERNS)`: exact substrings, so "ignore ALL prior instructions" or extra spaces bypass it. | `_has_injection_pattern()`: the same phrases as word- and whitespace-tolerant regexes, plus every `injection`-category pattern of the skills guard; both call sites use it. |
@@ -73,12 +76,18 @@ that must stay quiet).
 
 ## Tests run
 
-In a scratch venv (`uv sync --frozen --extra telegram --group dev --group test`, Python 3.14, macOS arm64):
+v0.22.7 (2026-11-04, mooxi-01, arm64, a throwaway user): inside the official v0.22.7 image's own venv
+(Python 3.14.9), with pytest 9.1.1 and pytest-asyncio 1.4.0 installed by the hashes in this tag's `uv.lock`.
+The patches' own tests: 51 passed. The existing suites for the touched code (`tests/gateway/test_telegram_*.py`,
+`test_slash*`, the approval, yolo, skills and chat-completions transport suites): 1704 passed, 32 failed,
+3 skipped, both with and without the patches. The same 32 fail on the bare tag (missing test extras in the image).
+
+v0.22.5: in a scratch venv (`uv sync --frozen --extra telegram --group dev --group test`, Python 3.14, macOS arm64):
 the new test files pass, and the existing suites for the touched code (`tests/gateway/test_telegram_*.py`,
 the approval/yolo/skills suites) show the same failures with and without these patches (failures that
 already happen on the bare tag in that environment).
 
-## Upstream status (2026-10-30)
+## Upstream status (2026-11-04: all still open)
 
 Each patch is meant to go away once upstream covers it (see gitlevo/mooxi `infra/mind/brain/README.md`).
 
