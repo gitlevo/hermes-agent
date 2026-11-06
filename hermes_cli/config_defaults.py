@@ -71,6 +71,10 @@ DEFAULT_CONFIG = {
         # elapsed; implicit provider stale timeouts capped to remaining budget. CLI equivalent:
         # `hermes chat --run-budget N`.
         "run_budget_seconds": None,
+        # Model-name markers (e.g. ["gpt-oss"]) whose chat template takes one tool call per assistant
+        # turn: the request copy splits a parallel batch into one assistant message per call, each with
+        # its result. Empty = unchanged. Stored history is never rewritten.
+        "single_tool_call_models": [],
         # Gateway inactivity timeout (seconds). Only fires when the agent is completely idle — not
         # while calling tools or receiving API responses. 0 = unlimited.
         "gateway_timeout": 1800,
@@ -1452,6 +1456,10 @@ DEFAULT_CONFIG = {
         # host-unapproved skill-author code; community hub installs never auto-execute (#63307).
         "inline_shell": False,
         "inline_shell_timeout": 10,  # seconds per !`cmd` snippet
+        # Skills hub (official, index, skills.sh, URL, GitHub taps, ClawHub, LobeHub, browse.sh). Off: every
+        # hub search, install, update and check finds no source, in the CLI, TUI, dashboard and chat tools.
+        # Skills already on disk and the agent's own skill_manage are unaffected.
+        "hub_enabled": True,
         # Security-scan skills the agent writes via skill_manage. Off: the agent can run the same
         # code via terminal() ungated, so it mostly blocks prose with risky keywords. On: a
         # dangerous verdict is a tool error the agent can retry. Hub installs are always scanned.
@@ -1681,6 +1689,9 @@ DEFAULT_CONFIG = {
         # / Cancel via tools.slash_confirm; native buttons on Telegram/ Discord/Slack). "Always
         # Approve" → false. HERMES_TUI_NO_CONFIRM=1 skips the TUI modal.
         "destructive_slash_confirm": True,
+        # mooxi patch: false makes --yolo / HERMES_YOLO_MODE and /yolo do nothing (see
+        # tools.approval_context.yolo_allowed). True is upstream behaviour.
+        "allow_yolo": True,
     },
     # Permanently allowed dangerous command patterns (added via "always" approval).
     "command_allowlist": [],
