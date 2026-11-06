@@ -62,7 +62,7 @@ rewritten. The switch is read live. Test: `tests/agent/transports/test_chat_comp
 
 ## 5. CVE status
 
-| CVE | Where | Status in v0.22.7 | What this branch does |
+| CVE | Where | Status in v0.23.0 | What this branch does |
 |---|---|---|---|
 | CVE-2026-9353 | `THREAT_PATTERNS` in the skills guard (advisory names `agent/skills_guard.py`; in v0.22.5 it is `tools/skills_guard.py`) | **Fixed upstream.** `sys_prompt_override` is `system\s+(?:\w+\s+)*prompt\s+(?:\w+\s+)*override` and `fake_policy` is `new\s+(?:\w+\s+)*policy…`, so the advisory's extra-word bypass ("system prompt temporary override") matches. | A regression test pins it. |
 | CVE-2026-10220 | `skill_view` / `_serve_plugin_skill` (`tools/skills_tool.py`; in v0.22.5 the shared code is in `tools/skills_tool_plugin.py`) | **Not fixed.** Both paths still test `any(p in content.lower() for p in _INJECTION_PATTERNS)`: exact substrings, so "ignore ALL prior instructions" or extra spaces bypass it. | `_has_injection_pattern()`: the same phrases as word- and whitespace-tolerant regexes, plus every `injection`-category pattern of the skills guard; both call sites use it. |
