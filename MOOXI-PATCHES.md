@@ -98,5 +98,5 @@ Each patch is meant to go away once upstream covers it (see gitlevo/mooxi `infra
 | 1. Forwarded Telegram messages | PR NousResearch/hermes-agent#146953: opt-in `platforms.telegram.extra.ignore_forwarded_messages` | it merges; mooxi then sets the switch |
 | 2. `approvals.allow_yolo` | issue #131038 (tied to the settings-lock PR #106869) asks for the same | that lands |
 | 3. `skills.hub_enabled` | PR #81273: `skills.hub.source_policy` (an allowlist; empty = every source off) | it merges; mooxi then sets an empty allowlist |
-| 4. `agent.single_tool_call_models` | not covered upstream (no issue or PR for gpt-oss and parallel tool calls in history as of 2026-11-02); to be offered | upstream splits batches for one-call templates; mooxi then drops the switch |
+| 4. `agent.single_tool_call_models` | PR NousResearch/hermes-agent#150182 (offered 2026-11-06, gitlevo/mooxi#268): the same opt-in switch | it merges; mooxi keeps setting it, from upstream's own key |
 | CVE-2026-10220 | PR NousResearch/hermes-agent#146952 (public under SECURITY.md §3.2; the CVE is on NVD) | it merges |
